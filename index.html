@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stalldienst</title>
+<style>
+  :root{
+    --bg:#23302A; --fg:#F1EBDA; --fg-dim:rgba(241,235,218,0.55);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--fg);padding-bottom:48px;}
+  .header{padding:22px 16px 14px;border-bottom:1px solid rgba(241,235,218,0.12);}
+  .title{font-weight:800;letter-spacing:.04em;font-size:26px;text-transform:uppercase;}
+  .subtitle{font-size:13px;color:var(--fg-dim);margin-top:2px;}
+  .status{font-size:12px;display:flex;align-items:center;gap:6px;margin-top:6px;}
+  .dot{width:8px;height:8px;border-radius:50%;background:#3E7C5A;}
+  .dot.offline{background:#C1502E;}
+  .navbtn{background:rgba(241,235,218,0.08);border:none;border-radius:8px;padding:8px 14px;cursor:pointer;color:var(--fg);font-size:18px;}
+  .monthnav{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;}
+  .monthlabel{font-size:17px;font-weight:700;}
+  .people{padding:0 16px 18px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+  .chip{display:inline-flex;align-items:center;gap:6px;background:rgba(241,235,218,0.07);border-radius:999px;padding:6px 10px 6px 8px;font-size:13px;cursor:pointer;}
+  .dotcolor{width:10px;height:10px;border-radius:50%;display:inline-block;flex-shrink:0;}
+  .addchip{display:inline-flex;align-items:center;gap:6px;background:transparent;border:1px dashed rgba(241,235,218,0.35);border-radius:999px;padding:6px 12px 6px 8px;font-size:13px;color:var(--fg);cursor:pointer;}
+  .day-row{display:grid;grid-template-columns:52px 1fr 1fr;gap:8px;padding:8px 4px;border-bottom:1px solid rgba(241,235,218,0.08);margin:0 12px;}
+  .daynum{display:flex;flex-direction:column;justify-content:center;}
+  .weekday{font-size:11px;color:var(--fg-dim);text-transform:uppercase;}
+  .num{font-size:18px;font-weight:800;}
+  .num.today,.weekday.today{color:#C9A227;}
+  .slot{border:1.5px dashed rgba(241,235,218,0.3);border-radius:8px;background:transparent;color:rgba(241,235,218,0.45);font-size:13px;padding:8px 10px;display:flex;flex-direction:column;gap:2px;cursor:pointer;min-height:48px;justify-content:center;text-align:left;width:100%;}
+  .slot.filled{border:none;border-left:5px solid var(--c);background:color-mix(in srgb, var(--c) 18%, transparent);color:var(--fg);}
+  .slotlabel{font-size:10px;text-transform:uppercase;opacity:.7;}
+  .slotname{font-weight:700;font-size:14px;}
+  .sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:flex-end;z-index:50;}
+  .sheet-overlay.open{display:flex;}
+  .sheet{width:100%;max-height:80vh;overflow-y:auto;background:#F1EBDA;color:#23302A;border-radius:18px 18px 0 0;padding:18px 18px 28px;}
+  .sheet-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+  .sheet-title{font-weight:800;font-size:16px;}
+  .closebtn{background:transparent;border:none;cursor:pointer;color:#23302A;font-size:20px;}
+  .person-btn{display:flex;align-items:center;gap:10px;border:none;border-radius:10px;padding:12px 14px;background:color-mix(in srgb, var(--c) 13%, white);border-left:5px solid var(--c);font-size:15px;font-weight:600;color:#23302A;text-align:left;cursor:pointer;width:100%;margin-bottom:8px;}
+  .clearbtn{margin-top:6px;width:100%;background:transparent;border:1px solid rgba(35,48,42,.25);border-radius:10px;padding:10px 0;font-size:14px;color:rgba(35,48,42,.7);cursor:pointer;}
+  input[type=text]{width:100%;box-sizing:border-box;padding:12px 14px;border-radius:10px;border:1px solid rgba(35,48,42,.2);font-size:15px;margin-bottom:14px;color:#23302A;}
+  .colorpick{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:18px;}
+  .colorbtn{width:32px;height:32px;border-radius:50%;border:3px solid transparent;cursor:pointer;}
+  .colorbtn.selected{border-color:#23302A;}
+  .addbtn{width:100%;padding:12px 0;border-radius:10px;border:none;background:#23302A;color:#F1EBDA;font-size:15px;font-weight:700;cursor:pointer;}
+  .addbtn:disabled{background:rgba(35,48,42,.3);cursor:default;}
+  .empty-note{color:rgba(35,48,42,.6);font-size:14px;padding:8px 4px;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="title">Stalldienst</div>
+  <div class="subtitle">Antippen, Name wählen, fertig.</div>
+  <div class="status"><span class="dot" id="statusDot"></span><span id="statusText">Verbinde…</span></div>
+</div>
+
+<div class="monthnav">
+  <button class="navbtn" id="prevMonth" aria-label="Vorheriger Monat">‹</button>
+  <div class="monthlabel" id="monthLabel"></div>
+  <button class="navbtn" id="nextMonth" aria-label="Nächster Monat">›</button>
+</div>
+
+<div class="people" id="peopleBoard"></div>
+
+<div id="daysList"></div>
+
+<div class="sheet-overlay" id="assignOverlay">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-header">
+      <div class="sheet-title" id="assignTitle"></div>
+      <button class="closebtn" id="assignClose">✕</button>
+    </div>
+    <div id="assignList"></div>
+    <button class="clearbtn" id="clearSlotBtn">Slot leeren</button>
+  </div>
+</div>
+
+<div class="sheet-overlay" id="addOverlay">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-header">
+      <div class="sheet-title">Person hinzufügen</div>
+      <button class="closebtn" id="addClose">✕</button>
+    </div>
+    <input type="text" id="nameInput" placeholder="Name" maxlength="40" />
+    <div class="colorpick" id="colorPick"></div>
+    <button class="addbtn" id="addConfirm" disabled>Hinzufügen</button>
+  </div>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import {
+    getDatabase, ref, onValue, set, remove, push
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+  // ============================================================
+  // HIER deine Firebase-Konfiguration einfügen
+  // (Firebase Console -> Projekteinstellungen -> "Web-App" -> Config)
+  // ============================================================
+  const firebaseConfig = {
+    apiKey: "DEIN_API_KEY",
+    authDomain: "DEIN_PROJEKT.firebaseapp.com",
+    databaseURL: "https://DEIN_PROJEKT-default-rtdb.firebaseio.com",
+    projectId: "DEIN_PROJEKT",
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+
+  const PALETTE = [
+    "#C1502E", "#3E7C5A", "#3E6B8A", "#C9A227", "#8B5E83",
+    "#5B4636", "#3E8E8A", "#B0743C", "#6B7A3E", "#A85C7A",
+  ];
+  const WEEKDAYS = ["Mo","Di","Mi","Do","Fr","Sa","So"];
+  const MONTHS = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+
+  let people = {};
+  let assignments = {};
+  let cursor = new Date(); cursor.setDate(1);
+  let activeSlotKey = null;
+  let chosenColor = PALETTE[0];
+
+  const pad = n => String(n).padStart(2,"0");
+  const dateKey = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const daysInMonth = (y,m) => new Date(y,m+1,0).getDate();
+  const isSameDay = (a,b) => a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
+
+  onValue(ref(db, ".info/connected"), snap => {
+    const connected = snap.val() === true;
+    document.getElementById("statusDot").classList.toggle("offline", !connected);
+    document.getElementById("statusText").textContent = connected ? "Live verbunden" : "Verbinde…";
+  });
+
+  onValue(ref(db, "people"), snap => {
+    people = snap.val() || {};
+    renderPeopleBoard();
+    renderColorPicker();
+    renderDays();
+  });
+
+  onValue(ref(db, "assignments"), snap => {
+    assignments = snap.val() || {};
+    renderDays();
+  });
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+  }
+
+  function renderPeopleBoard(){
+    const board = document.getElementById("peopleBoard");
+    board.innerHTML = "";
+    Object.entries(people).forEach(([id, p]) => {
+      const chip = document.createElement("span");
+      chip.className = "chip";
+      chip.style.border = `1px solid ${p.color}`;
+      chip.title = "Tippen zum Entfernen";
+      chip.innerHTML = `<span class="dotcolor" style="background:${p.color}"></span>${escapeHtml(p.name)} ✕`;
+      chip.onclick = () => removePerson(id);
+      board.appendChild(chip);
+    });
+    const addBtn = document.createElement("button");
+    addBtn.className = "addchip";
+    addBtn.innerHTML = "+ Person";
+    addBtn.onclick = openAddPerson;
+    board.appendChild(addBtn);
+  }
+
+  function openAddPerson(){
+    document.getElementById("nameInput").value = "";
+    const used = new Set(Object.values(people).map(p => p.color));
+    chosenColor = PALETTE.find(c => !used.has(c)) || PALETTE[0];
+    renderColorPicker();
+    document.getElementById("addConfirm").disabled = true;
+    document.getElementById("addOverlay").classList.add("open");
+    document.getElementById("nameInput").focus();
+  }
+
+  function renderColorPicker(){
+    const pick = document.getElementById("colorPick");
+    pick.innerHTML = "";
+    PALETTE.forEach(c => {
+      const b = document.createElement("button");
+      b.className = "colorbtn" + (c === chosenColor ? " selected" : "");
+      b.style.background = c;
+      b.onclick = () => { chosenColor = c; renderColorPicker(); };
+      pick.appendChild(b);
+    });
+  }
+
+  document.getElementById("nameInput").addEventListener("input", e => {
+    document.getElementById("addConfirm").disabled = !e.target.value.trim();
+  });
+  document.getElementById("nameInput").addEventListener("keydown", e => {
+    if (e.key === "Enter" && e.target.value.trim()) confirmAddPerson();
+  });
+  document.getElementById("addConfirm").onclick = confirmAddPerson;
+  document.getElementById("addClose").onclick = () => document.getElementById("addOverlay").classList.remove("open");
+  document.getElementById("addOverlay").onclick = () => document.getElementById("addOverlay").classList.remove("open");
+
+  function confirmAddPerson(){
+    const name = document.getElementById("nameInput").value.trim();
+    if (!name) return;
+    if (Object.keys(people).length >= 10){
+      alert("Maximal 10 Personen sind für diesen Plan vorgesehen.");
+      return;
+    }
+    const newRef = push(ref(db, "people"));
+    set(newRef, { name, color: chosenColor });
+    document.getElementById("addOverlay").classList.remove("open");
+  }
+
+  function removePerson(id){
+    if (!confirm(`${people[id]?.name || "Person"} wirklich entfernen?`)) return;
+    remove(ref(db, `people/${id}`));
+    Object.entries(assignments).forEach(([key, pid]) => {
+      if (pid === id) remove(ref(db, `assignments/${key}`));
+    });
+  }
+
+  function renderMonthNav(){
+    document.getElementById("monthLabel").textContent = `${MONTHS[cursor.getMonth()]} ${cursor.getFullYear()}`;
+  }
+
+  function renderDays(){
+    renderMonthNav();
+    const list = document.getElementById("daysList");
+    list.innerHTML = "";
+    const y = cursor.getFullYear(), m = cursor.getMonth();
+    const total = daysInMonth(y, m);
+    const today = new Date();
+
+    for (let d = 1; d <= total; d++){
+      const date = new Date(y, m, d);
+      const isToday = isSameDay(date, today);
+      const mKey = `${dateKey(date)}_morning`;
+      const eKey = `${dateKey(date)}_evening`;
+
+      const row = document.createElement("div");
+      row.className = "day-row";
+
+      const dayNum = document.createElement("div");
+      dayNum.className = "daynum";
+      dayNum.innerHTML = `
+        <div class="weekday ${isToday?'today':''}">${WEEKDAYS[(date.getDay()+6)%7]}</div>
+        <div class="num ${isToday?'today':''}">${d}</div>`;
+      row.appendChild(dayNum);
+
+      row.appendChild(makeSlot("Morgen", mKey, date));
+      row.appendChild(makeSlot("Abend", eKey, date));
+
+      list.appendChild(row);
+    }
+  }
+
+  function makeSlot(label, key, date){
+    const personId = assignments[key];
+    const person = personId ? people[personId] : null;
+    const btn = document.createElement("button");
+    btn.className = "slot" + (person ? " filled" : "");
+    if (person) btn.style.setProperty("--c", person.color);
+    btn.innerHTML = `<span class="slotlabel">${label}</span><span class="slotname">${person ? escapeHtml(person.name) : "+ eintragen"}</span>`;
+    btn.onclick = () => openAssign(key, `${label}, ${date.getDate()}. ${MONTHS[date.getMonth()]}`);
+    return btn;
+  }
+
+  function openAssign(key, title){
+    activeSlotKey = key;
+    document.getElementById("assignTitle").textContent = title;
+    const listEl = document.getElementById("assignList");
+    listEl.innerHTML = "";
+    const entries = Object.entries(people);
+    if (entries.length === 0){
+      listEl.innerHTML = `<div class="empty-note">Noch niemand angelegt. Füge oben eine Person hinzu.</div>`;
+    } else {
+      entries.forEach(([id, p]) => {
+        const b = document.createElement("button");
+        b.className = "person-btn";
+        b.style.setProperty("--c", p.color);
+        b.textContent = p.name;
+        b.onclick = () => {
+          set(ref(db, `assignments/${activeSlotKey}`), id);
+          document.getElementById("assignOverlay").classList.remove("open");
+        };
+        listEl.appendChild(b);
+      });
+    }
+    document.getElementById("assignOverlay").classList.add("open");
+  }
+
+  document.getElementById("clearSlotBtn").onclick = () => {
+    if (activeSlotKey) remove(ref(db, `assignments/${activeSlotKey}`));
+    document.getElementById("assignOverlay").classList.remove("open");
+  };
+  document.getElementById("assignClose").onclick = () => document.getElementById("assignOverlay").classList.remove("open");
+  document.getElementById("assignOverlay").onclick = () => document.getElementById("assignOverlay").classList.remove("open");
+
+  document.getElementById("prevMonth").onclick = () => {
+    cursor = new Date(cursor.getFullYear(), cursor.getMonth()-1, 1);
+    renderDays();
+  };
+  document.getElementById("nextMonth").onclick = () => {
+    cursor = new Date(cursor.getFullYear(), cursor.getMonth()+1, 1);
+    renderDays();
+  };
+
+  renderDays();
+</script>
+</body>
+</html>
