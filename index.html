@@ -19,8 +19,9 @@
   .navbtn{background:rgba(241,235,218,0.08);border:none;border-radius:8px;padding:8px 14px;cursor:pointer;color:var(--fg);font-size:18px;}
   .monthnav{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;}
   .monthlabel{font-size:17px;font-weight:700;}
-  .people{padding:0 16px 18px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
-  .chip{display:inline-flex;align-items:center;gap:6px;background:rgba(241,235,218,0.07);border-radius:999px;padding:6px 10px 6px 8px;font-size:13px;cursor:pointer;}
+  .people{padding:0 16px 6px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+  .people-hint{padding:0 16px 16px;font-size:12px;color:var(--fg-dim);}
+  .chip{display:inline-flex;align-items:center;gap:6px;background:rgba(241,235,218,0.07);border-radius:999px;padding:6px 10px 6px 8px;font-size:13px;cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:none;}
   .dotcolor{width:10px;height:10px;border-radius:50%;display:inline-block;flex-shrink:0;}
   .addchip{display:inline-flex;align-items:center;gap:6px;background:transparent;border:1px dashed rgba(241,235,218,0.35);border-radius:999px;padding:6px 12px 6px 8px;font-size:13px;color:var(--fg);cursor:pointer;}
   .day-row{display:grid;grid-template-columns:52px 1fr 1fr;gap:8px;padding:8px 4px;border-bottom:1px solid rgba(241,235,218,0.08);margin:0 12px;}
@@ -64,6 +65,7 @@
 </div>
 
 <div class="people" id="peopleBoard"></div>
+<div class="people-hint" id="peopleHint" style="display:none;">Person gedrückt halten (ca. 1 Sek.), um sie zu entfernen.</div>
 
 <div id="daysList"></div>
 
@@ -96,11 +98,6 @@
     getDatabase, ref, onValue, set, remove, push
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-  // ============================================================
-  // HIER deine Firebase-Konfiguration einfügen.
-  // WICHTIG: apiKey unten ist noch nicht vollständig (siehe "...").
-  // Trage deinen kompletten, echten apiKey aus Firebase ein!
-  // ============================================================
   const firebaseConfig = {
     apiKey: "AIzaSyCC8aSSuP8wA6Y4VAH3jiuoLqOneyIQZDo",
     authDomain: "stallplan-31dcb.firebaseapp.com",
@@ -116,7 +113,7 @@
 
   const PALETTE = [
     "#C1502E", "#3E7C5A", "#3E6B8A", "#C9A227", "#8B5E83",
-    "#5B4636", "#3E8E8A", "#B0743C", "#6B7A3E", "#A85C7A",
+    "#5B4636", "#3E8E8A", "#B0743C", "#6B7A3E", "#A85C7A", "#5C6BC0",
   ];
   const WEEKDAYS = ["Mo","Di","Mi","Do","Fr","Sa","So"];
   const MONTHS = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
@@ -154,6 +151,34 @@
     return s.replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
   }
 
+  // Entfernen nur nach "gedrückt halten" auslösen, damit ein
+  // versehentliches kurzes Antippen niemanden löscht.
+  function attachHoldToRemove(el, id){
+    let timer = null;
+    const start = (e) => {
+      e.preventDefault();
+      el.style.transition = "opacity .65s linear, transform .65s linear";
+      el.style.opacity = "0.3";
+      el.style.transform = "scale(0.92)";
+      timer = setTimeout(() => {
+        el.style.transition = "none";
+        el.style.opacity = "1";
+        el.style.transform = "scale(1)";
+        removePerson(id);
+      }, 700);
+    };
+    const cancel = () => {
+      clearTimeout(timer);
+      el.style.transition = "opacity .2s linear, transform .2s linear";
+      el.style.opacity = "1";
+      el.style.transform = "scale(1)";
+    };
+    el.addEventListener("pointerdown", start);
+    el.addEventListener("pointerup", cancel);
+    el.addEventListener("pointerleave", cancel);
+    el.addEventListener("pointercancel", cancel);
+  }
+
   function renderPeopleBoard(){
     const board = document.getElementById("peopleBoard");
     board.innerHTML = "";
@@ -161,9 +186,9 @@
       const chip = document.createElement("span");
       chip.className = "chip";
       chip.style.border = `1px solid ${p.color}`;
-      chip.title = "Tippen zum Entfernen";
-      chip.innerHTML = `<span class="dotcolor" style="background:${p.color}"></span>${escapeHtml(p.name)} ✕`;
-      chip.onclick = () => removePerson(id);
+      chip.title = "Gedrückt halten zum Entfernen";
+      chip.innerHTML = `<span class="dotcolor" style="background:${p.color}"></span>${escapeHtml(p.name)}`;
+      attachHoldToRemove(chip, id);
       board.appendChild(chip);
     });
     const addBtn = document.createElement("button");
@@ -171,6 +196,9 @@
     addBtn.innerHTML = "+ Person";
     addBtn.onclick = openAddPerson;
     board.appendChild(addBtn);
+
+    const hint = document.getElementById("peopleHint");
+    hint.style.display = Object.keys(people).length > 0 ? "block" : "none";
   }
 
   function openAddPerson(){
@@ -208,8 +236,8 @@
   function confirmAddPerson(){
     const name = document.getElementById("nameInput").value.trim();
     if (!name) return;
-    if (Object.keys(people).length >= 10){
-      alert("Maximal 10 Personen sind für diesen Plan vorgesehen.");
+    if (Object.keys(people).length >= PALETTE.length){
+      alert(`Maximal ${PALETTE.length} Personen sind für diesen Plan vorgesehen.`);
       return;
     }
     const newRef = push(ref(db, "people"));
@@ -218,7 +246,7 @@
   }
 
   function removePerson(id){
-    if (!confirm(`${people[id]?.name || "Person"} wirklich entfernen?`)) return;
+    if (!confirm(`${people[id]?.name || "Person"} wirklich entfernen? Alle ihre eingetragenen Dienste werden dabei ebenfalls gelöscht.`)) return;
     remove(ref(db, `people/${id}`));
     Object.entries(assignments).forEach(([key, pid]) => {
       if (pid === id) remove(ref(db, `assignments/${key}`));
