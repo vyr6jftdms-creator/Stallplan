@@ -97,17 +97,18 @@
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
   // ============================================================
-  // HIER deine Firebase-Konfiguration einfügen
-  // (Firebase Console -> Projekteinstellungen -> "Web-App" -> Config)
+  // HIER deine Firebase-Konfiguration einfügen.
+  // WICHTIG: apiKey unten ist noch nicht vollständig (siehe "...").
+  // Trage deinen kompletten, echten apiKey aus Firebase ein!
   // ============================================================
   const firebaseConfig = {
-   const firebaseConfig = {
-  apiKey: "AIzaSyCC8aSSuP8wA6Y4VAH3jiu...",          // dein echter Wert
-  authDomain: "stallplan-31dcb.firebaseapp.com",      // dein echter Wert
-  databaseURL: "https://stallplan-31dcb-default-rtdb.firebaseio.com",  // dein echter Wert
-  projectId: "stallplan-31dcb",                       // dein echter Wert
-};
-
+    apiKey: "AIzaSyCC8aSSuP8wA6Y4VAH3jiuoLqOneyIQZDo",
+    authDomain: "stallplan-31dcb.firebaseapp.com",
+    databaseURL: "https://stallplan-31dcb-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "stallplan-31dcb",
+    storageBucket: "stallplan-31dcb.firebasestorage.app",
+    messagingSenderId: "196008024703",
+    appId: "1:196008024703:web:776736ea499241e2c1fd4a",
   };
 
   const app = initializeApp(firebaseConfig);
