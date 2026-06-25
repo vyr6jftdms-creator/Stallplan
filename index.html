@@ -10,7 +10,11 @@
   }
   *{box-sizing:border-box;}
   body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--fg);padding-bottom:48px;}
-  .header{padding:22px 16px 14px;border-bottom:1px solid rgba(241,235,218,0.12);}
+  .board-section{padding:18px 16px 0;}
+  .board-title{font-weight:800;letter-spacing:.06em;font-size:14px;text-transform:uppercase;color:var(--fg-dim);margin-bottom:8px;}
+  textarea#boardText{width:100%;box-sizing:border-box;background:rgba(241,235,218,0.07);border:1px solid rgba(241,235,218,0.2);border-radius:10px;color:var(--fg);font-size:14px;padding:10px 12px;font-family:inherit;resize:vertical;min-height:64px;line-height:1.4;}
+  textarea#boardText::placeholder{color:rgba(241,235,218,0.35);}
+  .header{padding:16px 16px 14px;border-bottom:1px solid rgba(241,235,218,0.12);}
   .title{font-weight:800;letter-spacing:.04em;font-size:26px;text-transform:uppercase;}
   .subtitle{font-size:13px;color:var(--fg-dim);margin-top:2px;}
   .status{font-size:12px;display:flex;align-items:center;gap:6px;margin-top:6px;}
@@ -40,6 +44,7 @@
   .sheet-title{font-weight:800;font-size:16px;}
   .closebtn{background:transparent;border:none;cursor:pointer;color:#23302A;font-size:20px;}
   .person-btn{display:flex;align-items:center;gap:10px;border:none;border-radius:10px;padding:12px 14px;background:color-mix(in srgb, var(--c) 13%, white);border-left:5px solid var(--c);font-size:15px;font-weight:600;color:#23302A;text-align:left;cursor:pointer;width:100%;margin-bottom:8px;}
+  .backbtn{display:block;border:none;background:transparent;color:rgba(35,48,42,.6);font-size:13px;padding:4px 2px 12px;cursor:pointer;}
   .clearbtn{margin-top:6px;width:100%;background:transparent;border:1px solid rgba(35,48,42,.25);border-radius:10px;padding:10px 0;font-size:14px;color:rgba(35,48,42,.7);cursor:pointer;}
   input[type=text]{width:100%;box-sizing:border-box;padding:12px 14px;border-radius:10px;border:1px solid rgba(35,48,42,.2);font-size:15px;margin-bottom:14px;color:#23302A;}
   .colorpick{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:18px;}
@@ -51,6 +56,11 @@
 </style>
 </head>
 <body>
+
+<div class="board-section">
+  <div class="board-title">Schwarzes Brett</div>
+  <textarea id="boardText" rows="3" placeholder="Aktuelle Hinweise für alle..."></textarea>
+</div>
 
 <div class="header">
   <div class="title">Stalldienst</div>
@@ -117,6 +127,7 @@
   ];
   const WEEKDAYS = ["Mo","Di","Mi","Do","Fr","Sa","So"];
   const MONTHS = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+  const TASKS = ["Füttern", "Misten"];
 
   let people = {};
   let assignments = {};
@@ -133,6 +144,23 @@
     const connected = snap.val() === true;
     document.getElementById("statusDot").classList.toggle("offline", !connected);
     document.getElementById("statusText").textContent = connected ? "Live verbunden" : "Verbinde…";
+  });
+
+  // ---- Schwarzes Brett: automatisches Speichern beim Tippen ----
+  const boardTextEl = document.getElementById("boardText");
+  let boardFocused = false;
+  let boardDebounce = null;
+  boardTextEl.addEventListener("focus", () => { boardFocused = true; });
+  boardTextEl.addEventListener("blur", () => { boardFocused = false; });
+  boardTextEl.addEventListener("input", () => {
+    clearTimeout(boardDebounce);
+    boardDebounce = setTimeout(() => {
+      set(ref(db, "board"), boardTextEl.value);
+    }, 400);
+  });
+  onValue(ref(db, "board"), snap => {
+    if (boardFocused) return; // nicht überschreiben während jemand tippt
+    boardTextEl.value = snap.val() || "";
   });
 
   onValue(ref(db, "people"), snap => {
@@ -248,7 +276,8 @@
   function removePerson(id){
     if (!confirm(`${people[id]?.name || "Person"} wirklich entfernen? Alle ihre eingetragenen Dienste werden dabei ebenfalls gelöscht.`)) return;
     remove(ref(db, `people/${id}`));
-    Object.entries(assignments).forEach(([key, pid]) => {
+    Object.entries(assignments).forEach(([key, entry]) => {
+      const pid = entry && typeof entry === "object" ? entry.person : entry;
       if (pid === id) remove(ref(db, `assignments/${key}`));
     });
   }
@@ -281,20 +310,25 @@
         <div class="num ${isToday?'today':''}">${d}</div>`;
       row.appendChild(dayNum);
 
-      row.appendChild(makeSlot("Morgen", mKey, date));
-      row.appendChild(makeSlot("Abend", eKey, date));
+      row.appendChild(makeSlot("Morgens", mKey, date));
+      row.appendChild(makeSlot("Abends", eKey, date));
 
       list.appendChild(row);
     }
   }
 
   function makeSlot(label, key, date){
-    const personId = assignments[key];
+    const entry = assignments[key];
+    const personId = entry && typeof entry === "object" ? entry.person : entry;
+    const task = entry && typeof entry === "object" ? entry.task : null;
     const person = personId ? people[personId] : null;
     const btn = document.createElement("button");
     btn.className = "slot" + (person ? " filled" : "");
     if (person) btn.style.setProperty("--c", person.color);
-    btn.innerHTML = `<span class="slotlabel">${label}</span><span class="slotname">${person ? escapeHtml(person.name) : "+ eintragen"}</span>`;
+    const nameText = person
+      ? escapeHtml(person.name) + (task ? ` (${escapeHtml(task)})` : "")
+      : "+ eintragen";
+    btn.innerHTML = `<span class="slotlabel">${label}</span><span class="slotname">${nameText}</span>`;
     btn.onclick = () => openAssign(key, `${label}, ${date.getDate()}. ${MONTHS[date.getMonth()]}`);
     return btn;
   }
@@ -302,25 +336,50 @@
   function openAssign(key, title){
     activeSlotKey = key;
     document.getElementById("assignTitle").textContent = title;
+    renderPersonStep();
+    document.getElementById("assignOverlay").classList.add("open");
+  }
+
+  function renderPersonStep(){
     const listEl = document.getElementById("assignList");
     listEl.innerHTML = "";
     const entries = Object.entries(people);
     if (entries.length === 0){
       listEl.innerHTML = `<div class="empty-note">Noch niemand angelegt. Füge oben eine Person hinzu.</div>`;
-    } else {
-      entries.forEach(([id, p]) => {
-        const b = document.createElement("button");
-        b.className = "person-btn";
-        b.style.setProperty("--c", p.color);
-        b.textContent = p.name;
-        b.onclick = () => {
-          set(ref(db, `assignments/${activeSlotKey}`), id);
-          document.getElementById("assignOverlay").classList.remove("open");
-        };
-        listEl.appendChild(b);
-      });
+      return;
     }
-    document.getElementById("assignOverlay").classList.add("open");
+    entries.forEach(([id, p]) => {
+      const b = document.createElement("button");
+      b.className = "person-btn";
+      b.style.setProperty("--c", p.color);
+      b.textContent = p.name;
+      b.onclick = () => renderTaskStep(id);
+      listEl.appendChild(b);
+    });
+  }
+
+  function renderTaskStep(personId){
+    const p = people[personId];
+    const listEl = document.getElementById("assignList");
+    listEl.innerHTML = "";
+
+    const back = document.createElement("button");
+    back.className = "backbtn";
+    back.textContent = "‹ Zurück zur Personenwahl";
+    back.onclick = renderPersonStep;
+    listEl.appendChild(back);
+
+    TASKS.forEach(task => {
+      const b = document.createElement("button");
+      b.className = "person-btn";
+      b.style.setProperty("--c", p.color);
+      b.textContent = `${p.name} – ${task}`;
+      b.onclick = () => {
+        set(ref(db, `assignments/${activeSlotKey}`), { person: personId, task });
+        document.getElementById("assignOverlay").classList.remove("open");
+      };
+      listEl.appendChild(b);
+    });
   }
 
   document.getElementById("clearSlotBtn").onclick = () => {
