@@ -3,13 +3,23 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Stalldienst</title>
+<title>Stallplan</title>
 <style>
   :root{
     --bg:#23302A; --fg:#F1EBDA; --fg-dim:rgba(241,235,218,0.55);
   }
   *{box-sizing:border-box;}
   body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--fg);padding-bottom:48px;}
+
+  /* ---- Startseite ---- */
+  .home-view{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;}
+  .home-title{font-weight:800;letter-spacing:.05em;font-size:30px;text-transform:uppercase;margin-bottom:10px;}
+  .home-btn{width:100%;max-width:300px;padding:22px;border-radius:14px;border:1px solid rgba(241,235,218,0.25);background:rgba(241,235,218,0.07);color:var(--fg);font-size:18px;font-weight:700;cursor:pointer;letter-spacing:.02em;}
+  .home-btn:active{background:rgba(241,235,218,0.16);}
+  .back-row{padding:14px 16px 0;}
+  .backlink{background:transparent;border:none;color:var(--fg-dim);font-size:14px;cursor:pointer;padding:4px 0;}
+
+  /* ---- Stalldienst (bestehend) ---- */
   .board-section{padding:18px 16px 0;}
   .board-title{font-weight:800;letter-spacing:.06em;font-size:14px;text-transform:uppercase;color:var(--fg-dim);margin-bottom:8px;}
   textarea#boardText{width:100%;box-sizing:border-box;background:rgba(241,235,218,0.07);border:1px solid rgba(241,235,218,0.2);border-radius:10px;color:var(--fg);font-size:14px;padding:10px 12px;font-family:inherit;resize:vertical;min-height:64px;line-height:1.4;}
@@ -37,6 +47,32 @@
   .slot.filled{border:none;border-left:5px solid var(--c);background:color-mix(in srgb, var(--c) 18%, transparent);color:var(--fg);}
   .slotlabel{font-size:10px;text-transform:uppercase;opacity:.7;}
   .slotname{font-weight:700;font-size:14px;}
+
+  /* ---- Hallenplan ---- */
+  .hall-header{padding:16px 16px 0;}
+  .hall-title{font-weight:800;letter-spacing:.04em;font-size:22px;text-transform:uppercase;}
+  .hall-weeknav{display:flex;align-items:center;justify-content:space-between;padding:10px 16px 14px;gap:10px;}
+  .hall-weeklabel{font-size:13px;font-weight:700;text-align:center;flex:1;}
+  .hall-legend{display:flex;gap:14px;padding:0 16px 12px;font-size:11px;color:var(--fg-dim);}
+  .hall-legend span{display:inline-flex;align-items:center;gap:5px;}
+  .hall-legend .sw{width:9px;height:9px;border-radius:3px;display:inline-block;}
+  .hall-scroll{overflow-x:auto;padding:0 8px 24px;}
+  .hall-grid{display:flex;width:max-content;position:relative;}
+  .hall-timecol{width:38px;flex-shrink:0;position:relative;}
+  .hall-daycol{width:92px;flex-shrink:0;border-left:1px solid rgba(241,235,218,0.08);}
+  .hall-dayhead{text-align:center;padding:6px 2px;border-bottom:1px solid rgba(241,235,218,0.15);}
+  .hall-dayhead .wd{text-transform:uppercase;color:var(--fg-dim);font-size:11px;}
+  .hall-dayhead .dt{font-weight:700;font-size:13px;}
+  .hall-timehead{height:33px;}
+  .hall-slots{position:relative;}
+  .hall-slot{display:block;width:100%;border:none;border-bottom:1px solid rgba(241,235,218,0.06);background:transparent;cursor:pointer;padding:0;}
+  .hall-slot.hourline{border-bottom:1px solid rgba(241,235,218,0.18);}
+  .hall-hourlabel{position:absolute;right:4px;font-size:10px;color:var(--fg-dim);transform:translateY(-6px);}
+  .hall-event{position:absolute;left:2px;right:2px;border-radius:6px;background:color-mix(in srgb, var(--c) 32%, var(--bg));border-left:4px solid var(--c);padding:3px 5px;font-size:10.5px;color:var(--fg);overflow:hidden;cursor:pointer;line-height:1.25;z-index:2;}
+  .hall-event .ti{font-weight:700;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .hall-event .tm{opacity:.85;display:block;font-size:9.5px;}
+
+  /* ---- gemeinsame Sheets ---- */
   .sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:flex-end;z-index:50;}
   .sheet-overlay.open{display:flex;}
   .sheet{width:100%;max-height:80vh;overflow-y:auto;background:#F1EBDA;color:#23302A;border-radius:18px 18px 0 0;padding:18px 18px 28px;}
@@ -53,32 +89,72 @@
   .addbtn{width:100%;padding:12px 0;border-radius:10px;border:none;background:#23302A;color:#F1EBDA;font-size:15px;font-weight:700;cursor:pointer;}
   .addbtn:disabled{background:rgba(35,48,42,.3);cursor:default;}
   .empty-note{color:rgba(35,48,42,.6);font-size:14px;padding:8px 4px;}
+  .fieldlabel{font-size:13px;color:rgba(35,48,42,.7);display:block;margin-bottom:6px;}
+  select#hallDurationSelect{width:100%;padding:10px;border-radius:10px;border:1px solid rgba(35,48,42,.2);font-size:15px;background:white;color:#23302A;}
+  .recur-row{display:flex;align-items:center;gap:8px;font-size:14px;color:rgba(35,48,42,.85);margin:16px 0 20px;}
 </style>
 </head>
 <body>
 
-<div class="board-section">
-  <div class="board-title">Schwarzes Brett</div>
-  <textarea id="boardText" rows="3" placeholder="Aktuelle Hinweise für alle..."></textarea>
+<!-- ============ STARTSEITE ============ -->
+<div class="home-view" id="homeView">
+  <div class="home-title">Stallplan</div>
+  <button class="home-btn" id="goStall">🐴 Stalldienst</button>
+  <button class="home-btn" id="goHall">🏟️ Hallenplan</button>
 </div>
 
-<div class="header">
-  <div class="title">Stalldienst</div>
-  <div class="subtitle">Antippen, Name wählen, fertig.</div>
-  <div class="status"><span class="dot" id="statusDot"></span><span id="statusText">Verbinde…</span></div>
+<!-- ============ STALLDIENST ============ -->
+<div id="stallView" style="display:none;">
+  <div class="back-row"><button class="backlink" id="stallBack">‹ Zur Startseite</button></div>
+
+  <div class="board-section">
+    <div class="board-title">Schwarzes Brett</div>
+    <textarea id="boardText" rows="3" placeholder="Aktuelle Hinweise für alle..."></textarea>
+  </div>
+
+  <div class="header">
+    <div class="title">Stalldienst</div>
+    <div class="subtitle">Antippen, Name wählen, fertig.</div>
+    <div class="status"><span class="dot" id="statusDot"></span><span id="statusText">Verbinde…</span></div>
+  </div>
+
+  <div class="monthnav">
+    <button class="navbtn" id="prevMonth" aria-label="Vorheriger Monat">‹</button>
+    <div class="monthlabel" id="monthLabel"></div>
+    <button class="navbtn" id="nextMonth" aria-label="Nächster Monat">›</button>
+  </div>
+
+  <div class="people" id="peopleBoard"></div>
+  <div class="people-hint" id="peopleHint" style="display:none;">Person gedrückt halten (ca. 1 Sek.), um sie zu entfernen.</div>
+
+  <div id="daysList"></div>
 </div>
 
-<div class="monthnav">
-  <button class="navbtn" id="prevMonth" aria-label="Vorheriger Monat">‹</button>
-  <div class="monthlabel" id="monthLabel"></div>
-  <button class="navbtn" id="nextMonth" aria-label="Nächster Monat">›</button>
+<!-- ============ HALLENPLAN ============ -->
+<div id="hallView" style="display:none;">
+  <div class="back-row"><button class="backlink" id="hallBack">‹ Zur Startseite</button></div>
+
+  <div class="hall-header">
+    <div class="hall-title">Hallenplan</div>
+  </div>
+
+  <div class="hall-weeknav">
+    <button class="navbtn" id="hallPrevWeek" aria-label="Vorherige Woche">‹</button>
+    <div class="hall-weeklabel" id="hallWeekLabel"></div>
+    <button class="navbtn" id="hallNextWeek" aria-label="Nächste Woche">›</button>
+  </div>
+
+  <div class="hall-legend">
+    <span><span class="sw" style="background:#C1502E;"></span>einmalig</span>
+    <span><span class="sw" style="background:#3E6B8A;"></span>Regeltermin 🔁</span>
+  </div>
+
+  <div class="hall-scroll">
+    <div class="hall-grid" id="hallGrid"></div>
+  </div>
 </div>
 
-<div class="people" id="peopleBoard"></div>
-<div class="people-hint" id="peopleHint" style="display:none;">Person gedrückt halten (ca. 1 Sek.), um sie zu entfernen.</div>
-
-<div id="daysList"></div>
-
+<!-- ============ Sheets: Stalldienst ============ -->
 <div class="sheet-overlay" id="assignOverlay">
   <div class="sheet" onclick="event.stopPropagation()">
     <div class="sheet-header">
@@ -99,6 +175,43 @@
     <input type="text" id="nameInput" placeholder="Name" maxlength="40" />
     <div class="colorpick" id="colorPick"></div>
     <button class="addbtn" id="addConfirm" disabled>Hinzufügen</button>
+  </div>
+</div>
+
+<!-- ============ Sheets: Hallenplan ============ -->
+<div class="sheet-overlay" id="hallCreateOverlay">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-header">
+      <div class="sheet-title">Termin erstellen</div>
+      <button class="closebtn" id="hallCreateClose">✕</button>
+    </div>
+    <div class="empty-note" id="hallCreateTimeLabel" style="padding:0 0 12px;font-weight:700;color:#23302A;"></div>
+    <input type="text" id="hallTitleInput" placeholder="Was findet statt? (z. B. Reitstunde Anna)" maxlength="50" />
+    <label class="fieldlabel">Dauer</label>
+    <select id="hallDurationSelect">
+      <option value="15">15 Minuten</option>
+      <option value="30">30 Minuten</option>
+      <option value="45">45 Minuten</option>
+      <option value="60" selected>1 Stunde</option>
+      <option value="90">1,5 Stunden</option>
+      <option value="120">2 Stunden</option>
+    </select>
+    <label class="recur-row">
+      <input type="checkbox" id="hallRecurringCheck" />
+      Regeltermin (wiederholt sich jede Woche)
+    </label>
+    <button class="addbtn" id="hallCreateConfirm">Termin erstellen</button>
+  </div>
+</div>
+
+<div class="sheet-overlay" id="hallViewOverlay">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-header">
+      <div class="sheet-title">Termin</div>
+      <button class="closebtn" id="hallViewClose">✕</button>
+    </div>
+    <div id="hallViewDetails" style="margin-bottom:18px;color:#23302A;font-size:15px;line-height:1.5;"></div>
+    <button class="clearbtn" id="hallDeleteBtn">Termin löschen</button>
   </div>
 </div>
 
@@ -129,16 +242,38 @@
   const MONTHS = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
   const TASKS = ["Füttern", "Misten"];
 
+  const pad = n => String(n).padStart(2,"0");
+  const dateKey = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const daysInMonth = (y,m) => new Date(y,m+1,0).getDate();
+  const isSameDay = (a,b) => a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+  }
+
+  // ===================================================================
+  // VIEW-NAVIGATION
+  // ===================================================================
+  let currentView = "home";
+  function showView(view){
+    currentView = view;
+    document.getElementById("homeView").style.display = view === "home" ? "flex" : "none";
+    document.getElementById("stallView").style.display = view === "stall" ? "block" : "none";
+    document.getElementById("hallView").style.display = view === "hall" ? "block" : "none";
+    if (view === "hall") renderHallWeek();
+  }
+  document.getElementById("goStall").onclick = () => showView("stall");
+  document.getElementById("goHall").onclick = () => showView("hall");
+  document.getElementById("stallBack").onclick = () => showView("home");
+  document.getElementById("hallBack").onclick = () => showView("home");
+
+  // ===================================================================
+  // STALLDIENST (wie zuvor)
+  // ===================================================================
   let people = {};
   let assignments = {};
   let cursor = new Date(); cursor.setDate(1);
   let activeSlotKey = null;
   let chosenColor = PALETTE[0];
-
-  const pad = n => String(n).padStart(2,"0");
-  const dateKey = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-  const daysInMonth = (y,m) => new Date(y,m+1,0).getDate();
-  const isSameDay = (a,b) => a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
 
   onValue(ref(db, ".info/connected"), snap => {
     const connected = snap.val() === true;
@@ -146,7 +281,6 @@
     document.getElementById("statusText").textContent = connected ? "Live verbunden" : "Verbinde…";
   });
 
-  // ---- Schwarzes Brett: automatisches Speichern beim Tippen ----
   const boardTextEl = document.getElementById("boardText");
   let boardFocused = false;
   let boardDebounce = null;
@@ -159,7 +293,7 @@
     }, 400);
   });
   onValue(ref(db, "board"), snap => {
-    if (boardFocused) return; // nicht überschreiben während jemand tippt
+    if (boardFocused) return;
     boardTextEl.value = snap.val() || "";
   });
 
@@ -175,12 +309,6 @@
     renderDays();
   });
 
-  function escapeHtml(s){
-    return s.replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
-  }
-
-  // Entfernen nur nach "gedrückt halten" auslösen, damit ein
-  // versehentliches kurzes Antippen niemanden löscht.
   function attachHoldToRemove(el, id){
     let timer = null;
     const start = (e) => {
@@ -398,7 +526,204 @@
     renderDays();
   };
 
+  // ===================================================================
+  // HALLENPLAN
+  // ===================================================================
+  const HALL_START_MIN = 8 * 60;
+  const HALL_END_MIN = 20 * 60;
+  const SLOT_MIN = 15;
+  const SLOT_COUNT = (HALL_END_MIN - HALL_START_MIN) / SLOT_MIN; // 48
+  const ROW_H = 18;
+
+  let hallEvents = {};
+  let pendingHallDate = null, pendingHallStart = null, pendingHallWeekday = null;
+  let pendingDeleteId = null;
+
+  function getMonday(d){
+    const date = new Date(d);
+    const day = (date.getDay() + 6) % 7;
+    date.setDate(date.getDate() - day);
+    date.setHours(0,0,0,0);
+    return date;
+  }
+  let hallCursor = getMonday(new Date());
+
+  function getISOWeek(d){
+    const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    const dayNum = (date.getUTCDay() + 6) % 7;
+    date.setUTCDate(date.getUTCDate() - dayNum + 3);
+    const firstThursday = new Date(Date.UTC(date.getUTCFullYear(), 0, 4));
+    const diff = (date - firstThursday) / 86400000;
+    return 1 + Math.round(diff / 7);
+  }
+
+  function timeLabel(min){
+    return `${pad(Math.floor(min/60))}:${pad(min%60)}`;
+  }
+
+  onValue(ref(db, "hallEvents"), snap => {
+    hallEvents = snap.val() || {};
+    if (currentView === "hall") renderHallWeek();
+  });
+
+  function renderHallWeek(){
+    const monday = hallCursor;
+    const sunday = new Date(monday); sunday.setDate(sunday.getDate() + 6);
+    const fmt = d => `${pad(d.getDate())}.${pad(d.getMonth()+1)}.`;
+    document.getElementById("hallWeekLabel").textContent =
+      `KW ${getISOWeek(monday)}  ·  ${fmt(monday)} – ${fmt(sunday)}`;
+
+    const grid = document.getElementById("hallGrid");
+    grid.innerHTML = "";
+
+    const timeCol = document.createElement("div");
+    timeCol.className = "hall-timecol";
+    timeCol.style.height = `${33 + SLOT_COUNT * ROW_H}px`;
+    const timeHead = document.createElement("div");
+    timeHead.className = "hall-timehead";
+    timeCol.appendChild(timeHead);
+    for (let i = 0; i <= SLOT_COUNT; i += 4){
+      const lbl = document.createElement("div");
+      lbl.className = "hall-hourlabel";
+      lbl.style.top = `${33 + i * ROW_H}px`;
+      lbl.textContent = timeLabel(HALL_START_MIN + i * SLOT_MIN);
+      timeCol.appendChild(lbl);
+    }
+    grid.appendChild(timeCol);
+
+    for (let i = 0; i < 7; i++){
+      const date = new Date(monday); date.setDate(date.getDate() + i);
+      const dKey = dateKey(date);
+
+      const col = document.createElement("div");
+      col.className = "hall-daycol";
+
+      const head = document.createElement("div");
+      head.className = "hall-dayhead";
+      head.innerHTML = `<div class="wd">${WEEKDAYS[i]}</div><div class="dt">${pad(date.getDate())}.${pad(date.getMonth()+1)}.</div>`;
+      col.appendChild(head);
+
+      const slotsWrap = document.createElement("div");
+      slotsWrap.className = "hall-slots";
+      slotsWrap.style.height = `${SLOT_COUNT * ROW_H}px`;
+
+      for (let s = 0; s < SLOT_COUNT; s++){
+        const slotBtn = document.createElement("button");
+        slotBtn.className = "hall-slot" + (s % 4 === 0 ? " hourline" : "");
+        slotBtn.style.height = `${ROW_H}px`;
+        const startMin = HALL_START_MIN + s * SLOT_MIN;
+        slotBtn.onclick = () => openCreateEvent(dKey, startMin, i);
+        slotsWrap.appendChild(slotBtn);
+      }
+
+      Object.entries(hallEvents).forEach(([id, ev]) => {
+        const matches = ev.recurring ? ev.weekday === i : ev.date === dKey;
+        if (!matches) return;
+        const block = document.createElement("div");
+        block.className = "hall-event";
+        const top = (ev.startMinutes - HALL_START_MIN) / SLOT_MIN * ROW_H;
+        const height = ev.durationMinutes / SLOT_MIN * ROW_H;
+        block.style.top = `${top}px`;
+        block.style.height = `${Math.max(height, ROW_H - 2)}px`;
+        block.style.setProperty("--c", ev.recurring ? "#3E6B8A" : "#C1502E");
+        block.innerHTML = `<span class="ti">${escapeHtml(ev.title)}${ev.recurring ? " 🔁" : ""}</span><span class="tm">${timeLabel(ev.startMinutes)}–${timeLabel(ev.startMinutes + ev.durationMinutes)}</span>`;
+        block.onclick = (e) => { e.stopPropagation(); openViewEvent(id, ev); };
+        slotsWrap.appendChild(block);
+      });
+
+      col.appendChild(slotsWrap);
+      grid.appendChild(col);
+    }
+  }
+
+  document.getElementById("hallPrevWeek").onclick = () => {
+    hallCursor.setDate(hallCursor.getDate() - 7);
+    renderHallWeek();
+  };
+  document.getElementById("hallNextWeek").onclick = () => {
+    hallCursor.setDate(hallCursor.getDate() + 7);
+    renderHallWeek();
+  };
+
+  function openCreateEvent(dKey, startMin, weekdayIdx){
+    pendingHallDate = dKey;
+    pendingHallStart = startMin;
+    pendingHallWeekday = weekdayIdx;
+    document.getElementById("hallTitleInput").value = "";
+    document.getElementById("hallDurationSelect").value = "60";
+    document.getElementById("hallRecurringCheck").checked = false;
+    const [y, mo, da] = dKey.split("-");
+    document.getElementById("hallCreateTimeLabel").textContent =
+      `${da}.${mo}.${y}, ab ${timeLabel(startMin)} Uhr`;
+    document.getElementById("hallCreateOverlay").classList.add("open");
+    document.getElementById("hallTitleInput").focus();
+  }
+
+  document.getElementById("hallCreateClose").onclick = () => document.getElementById("hallCreateOverlay").classList.remove("open");
+  document.getElementById("hallCreateOverlay").onclick = () => document.getElementById("hallCreateOverlay").classList.remove("open");
+
+  document.getElementById("hallCreateConfirm").onclick = () => {
+    const title = document.getElementById("hallTitleInput").value.trim();
+    if (!title){ alert("Bitte einen Titel eingeben."); return; }
+    const duration = parseInt(document.getElementById("hallDurationSelect").value, 10);
+    const recurring = document.getElementById("hallRecurringCheck").checked;
+
+    if (pendingHallStart + duration > HALL_END_MIN){
+      alert("Der Termin würde über 20:00 Uhr hinausgehen. Bitte kürzere Dauer wählen.");
+      return;
+    }
+
+    const newEnd = pendingHallStart + duration;
+    const overlap = Object.values(hallEvents).some(ev => {
+      const matchesOccurrence = ev.recurring
+        ? ev.weekday === pendingHallWeekday
+        : ev.date === pendingHallDate;
+      if (!matchesOccurrence) return false;
+      const evEnd = ev.startMinutes + ev.durationMinutes;
+      return pendingHallStart < evEnd && newEnd > ev.startMinutes;
+    });
+    if (overlap){
+      alert("In diesem Zeitraum ist die Halle schon belegt.");
+      return;
+    }
+
+    const newRef = push(ref(db, "hallEvents"));
+    set(newRef, {
+      title,
+      date: recurring ? null : pendingHallDate,
+      weekday: pendingHallWeekday,
+      startMinutes: pendingHallStart,
+      durationMinutes: duration,
+      recurring,
+    });
+    document.getElementById("hallCreateOverlay").classList.remove("open");
+  };
+
+  function openViewEvent(id, ev){
+    pendingDeleteId = id;
+    const recurNote = ev.recurring
+      ? "<br><strong>Regeltermin</strong> – wiederholt sich jede Woche."
+      : "";
+    document.getElementById("hallViewDetails").innerHTML =
+      `<strong>${escapeHtml(ev.title)}</strong><br>${timeLabel(ev.startMinutes)} – ${timeLabel(ev.startMinutes + ev.durationMinutes)} Uhr${recurNote}`;
+    document.getElementById("hallViewOverlay").classList.add("open");
+  }
+
+  document.getElementById("hallViewClose").onclick = () => document.getElementById("hallViewOverlay").classList.remove("open");
+  document.getElementById("hallViewOverlay").onclick = () => document.getElementById("hallViewOverlay").classList.remove("open");
+
+  document.getElementById("hallDeleteBtn").onclick = () => {
+    if (!pendingDeleteId) return;
+    if (!confirm("Diesen Termin wirklich löschen? Bei einem Regeltermin wird die komplette Wiederholung entfernt.")) return;
+    remove(ref(db, `hallEvents/${pendingDeleteId}`));
+    document.getElementById("hallViewOverlay").classList.remove("open");
+  };
+
+  // ===================================================================
+  // Start
+  // ===================================================================
   renderDays();
+  showView("home");
 </script>
 </body>
 </html>
