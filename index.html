@@ -198,11 +198,18 @@
     <label class="fieldlabel">Wochentag</label>
     <div class="weekday-pick" id="weekdayPick"></div>
 
-    <label class="fieldlabel" style="margin-top:16px;">Uhrzeit</label>
+    <label class="fieldlabel" style="margin-top:16px;">Beginn</label>
     <div class="wheel-row">
       <div class="wheel-scroll" id="hourWheel"></div>
       <div class="wheel-sep">:</div>
       <div class="wheel-scroll" id="minuteWheel"></div>
+    </div>
+
+    <label class="fieldlabel" style="margin-top:14px;">Ende</label>
+    <div class="wheel-row">
+      <div class="wheel-scroll" id="hourWheelEnd"></div>
+      <div class="wheel-sep">:</div>
+      <div class="wheel-scroll" id="minuteWheelEnd"></div>
     </div>
 
     <label class="fieldlabel" style="margin-top:16px;">Name</label>
@@ -552,6 +559,8 @@
   let selectedWeekday = 0;
   let selectedHour = 9;
   let selectedMinute = 0;
+  let selectedEndHour = 10;
+  let selectedEndMinute = 0;
 
   function getMonday(d){
     const date = new Date(d);
@@ -621,7 +630,8 @@
           const chip = document.createElement("div");
           chip.className = "hall-chip";
           chip.style.setProperty("--c", ev.recurring ? "#3E6B8A" : "#C1502E");
-          chip.innerHTML = `<div class="ti">${escapeHtml(ev.title)}${ev.recurring ? " 🔁" : ""}</div><div class="tm">${timeLabel(ev.startMinutes)} Uhr</div>`;
+          const endLabel = ev.endMinutes != null ? `–${timeLabel(ev.endMinutes)}` : "";
+          chip.innerHTML = `<div class="ti">${escapeHtml(ev.title)}${ev.recurring ? " 🔁" : ""}</div><div class="tm">${timeLabel(ev.startMinutes)}${endLabel} Uhr</div>`;
           chip.onclick = () => openViewEvent(id, ev);
           chipsWrap.appendChild(chip);
         });
@@ -702,11 +712,15 @@
     selectedWeekday = (new Date().getDay() + 6) % 7;
     selectedHour = 9;
     selectedMinute = 0;
+    selectedEndHour = 10;
+    selectedEndMinute = 0;
     document.getElementById("hallTitleInput").value = "";
     document.getElementById("hallRecurringCheck").checked = false;
     renderWeekdayPick();
     setupWheel("hourWheel", HOUR_VALUES, 9, v => selectedHour = v);
     setupWheel("minuteWheel", MINUTE_VALUES, 0, v => selectedMinute = v);
+    setupWheel("hourWheelEnd", HOUR_VALUES, 10, v => selectedEndHour = v);
+    setupWheel("minuteWheelEnd", MINUTE_VALUES, 0, v => selectedEndMinute = v);
     document.getElementById("hallCreateOverlay").classList.add("open");
   }
   document.getElementById("hallAddBtn").onclick = openHallCreate;
@@ -718,9 +732,18 @@
     if (!title){ alert("Bitte einen Namen eingeben."); return; }
     const recurring = document.getElementById("hallRecurringCheck").checked;
     const startMinutes = selectedHour * 60 + selectedMinute;
+    const endMinutes = selectedEndHour * 60 + selectedEndMinute;
 
     if (startMinutes < HALL_START_MIN || startMinutes >= HALL_END_MIN){
-      alert("Bitte eine Uhrzeit zwischen 08:00 und 19:45 Uhr wählen.");
+      alert("Bitte einen Beginn zwischen 08:00 und 19:45 Uhr wählen.");
+      return;
+    }
+    if (endMinutes <= startMinutes){
+      alert("Das Ende muss nach dem Beginn liegen.");
+      return;
+    }
+    if (endMinutes > HALL_END_MIN){
+      alert("Das Ende darf nicht nach 20:00 Uhr liegen.");
       return;
     }
 
@@ -733,6 +756,7 @@
       date: recurring ? null : dKey,
       weekday: selectedWeekday,
       startMinutes,
+      endMinutes,
       recurring,
     });
     document.getElementById("hallCreateOverlay").classList.remove("open");
@@ -743,8 +767,9 @@
     const recurNote = ev.recurring
       ? "<br><strong>Regeltermin</strong> – wiederholt sich jede Woche."
       : "";
+    const endLabel = ev.endMinutes != null ? ` – ${timeLabel(ev.endMinutes)}` : "";
     document.getElementById("hallViewDetails").innerHTML =
-      `<strong>${escapeHtml(ev.title)}</strong><br>${timeLabel(ev.startMinutes)} Uhr${recurNote}`;
+      `<strong>${escapeHtml(ev.title)}</strong><br>${timeLabel(ev.startMinutes)}${endLabel} Uhr${recurNote}`;
     document.getElementById("hallViewOverlay").classList.add("open");
   }
 
